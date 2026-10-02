@@ -1,4 +1,4 @@
-# Compute Theory Final Project — LLM 排程助理 Discord Bot
+# CalenGenie — LLM 排程助理 Discord Bot
 
 一個以 **Discord** 為介面、以 **Ollama LLM API** 的個人排程 Agent。
 使用者在 Discord 中 @bot 用自然語言描述行程或任務，LLM 透過 **tool calling** 讀寫本地 JSON 資料庫，
