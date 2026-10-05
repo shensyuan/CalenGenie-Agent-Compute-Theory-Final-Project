@@ -36,6 +36,7 @@ Test/
 │       ├── update.py        # update_item_properties
 │       ├── reset_data.py    # reset_all_data
 │       └── eat.py           # get_dinner_recommendation
+├── FSM.png                  # 單次請求的狀態機流程圖
 ├── task_database.json       # 排程資料庫
 ├── requirements.txt
 └── .env.example
@@ -48,6 +49,25 @@ Test/
 `tool_list`（給 Ollama 的 schema）與 `func_map`（實際可呼叫的函式），名稱為 `ClassName.method`。
 方法的 docstring 與 `pydantic.Field(description=...)` 會自動變成工具說明與參數描述。
 `agent/tools/__init__.py` 會自動 import 目錄下所有模組，新增工具只需新增一個檔案。
+
+### 請求處理流程（狀態機）
+
+一次 @mention 從收到到回覆是一台有限狀態機，狀態與轉移如下：
+
+![單次請求的狀態機](FSM.png)
+
+| 狀態 | 做的事 | 對應程式 |
+|---|---|---|
+| `IDLE` | 等待訊息；作者是 bot 或沒 @到自己就忽略 | `bot.py` `on_message` 開頭的守衛 |
+| `PARSE` | 去掉 mention、比對快速指令 | `_strip_mentions` / `_find_quick_command` |
+| `QUICK_COMMAND` | 執行 `help`／`ping`／`reset`，不經過 LLM | `QUICK_COMMANDS` |
+| `THINKING` | 送出「🤔 正在思考中」佔位訊息 | `bot.py` `message.reply(THINKING_TEXT)` |
+| `CALL_LLM` | 帶著 system prompt + 頻道歷史呼叫 Ollama | `agent/agent.py` `_chat` |
+| `EXECUTE_TOOLS` | 執行這一輪所有 tool calls，以 `role="tool"` 回填結果 | `agent/agent.py` `_run_tool` |
+| `REPLY` | 寫入頻道歷史、超過 2000 字分段、編輯佔位訊息 | `bot.py` `_split_message` |
+| `ERROR` | 顯示 ⚠️ 並把該則使用者訊息從歷史回滾 | `bot.py` 的 `except` / `agent/agent.py` `history.pop()` |
+
+`CALL_LLM ↔ EXECUTE_TOOLS` 是流程中唯一的迴圈，上限為 `MAX_TOOL_ROUNDS = 10` 回合。
 
 ### 對話與 Tool-calling 迴圈（`agent/agent.py`）
 
